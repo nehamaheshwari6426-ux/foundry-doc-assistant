@@ -11,7 +11,6 @@ REPO_URL="https://github.com/MicrosoftDocs/azure-ai-docs.git"
 TARGET_DIR="corpus/source"
 PATHS=(
   "articles/foundry"
-#   "articles/ai-foundry"
 )
 
 if [[ -d "${TARGET_DIR}/.git" ]]; then

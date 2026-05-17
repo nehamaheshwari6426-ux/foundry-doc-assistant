@@ -2,17 +2,6 @@
 
 A retrieval-augmented question-answering system over Azure AI Foundry's conceptual and how-to documentation. Cited answers, measured evals, decisions defended with numbers.
 
-## Project contains
-foundry-doc-assistant/
-├── README.md            # updated Sunday with locked stack
-├── LICENSE
-├── .gitignore           # + corpus/ added
-├── pyproject.toml       # or requirements.txt
-├── scripts/
-│   ├── fetch_corpus.sh  # sparse-checkout of MicrosoftDocs
-│   └── prepare_corpus.py # markdown cleaning
-└── corpus/              # gitignored — regenerated, not committed
-
 ## What this is
 
 This is a learning project, not a product.
@@ -23,11 +12,13 @@ The system itself is straightforward: ask a natural-language question about Azur
 
 ## Corpus
 
-The **conceptual** and **how-to** sections of the [Azure AI Foundry documentation](https://learn.microsoft.com/en-us/azure/ai-foundry/).
+The **conceptual** and **how-to** content under [Microsoft Foundry documentation](https://learn.microsoft.com/en-us/azure/foundry/), sourced from [`MicrosoftDocs/azure-ai-docs`](https://github.com/MicrosoftDocs/azure-ai-docs).
 
 API reference is deliberately excluded. Reference content gets little uplift from RAG and dilutes eval signal — questions like "what's the signature of X" reward keyword search, not retrieval over prose. Concepts and how-to content is large enough to surface real retrieval problems (hundreds of pages, overlapping topics, mixed prose styles) but cohesive enough to build a defensible golden dataset against.
 
-## Architecture (v0.1 — finalised W2)
+After cleaning, the corpus is **283 records**. Microsoft recently consolidated the older `articles/ai-foundry/` path into `articles/foundry/`, so the latter is the only active root. The acquisition and cleaning pipeline is fully reproducible — see [Reproduce](#reproduce).
+
+## Architecture (v0.1)
 
 ```
 question
@@ -45,13 +36,13 @@ embedder ──► vector store ──► top-k chunks
                                  eval
 ```
 
-Planned stack:
+Stack, with rationale and revisit triggers:
 
-- **Language**: Python
-- **Embeddings**: Azure OpenAI `text-embedding-3-small` (default; `-large` if recall demands it)
-- **Generator**: Claude or GPT-4o — picked in W2 on a small cost/quality bake-off
-- **Vector store**: ChromaDB locally, pgvector if hosting forces a change
-- **Eval harness**: starts inline here, extracted into a standalone tool from month 4
+- **Language**: Python.
+- **Embeddings**: Azure OpenAI `text-embedding-3-small`. Cheap, well-supported, fine for general docs prose. *Revisit at W6 — upgrade to `-large` if recall@k disappoints.*
+- **Generator**: Azure OpenAI GPT-4o. Same provider as embeddings — one credential, simpler ops. A Claude vs GPT-4o bake-off is genuinely useful but premature without evals to judge it. *Revisit at W7 when golden-set numbers exist.*
+- **Vector store**: ChromaDB with local persistence. Trivial setup, clean swap path. pgvector is the upgrade if hosting or scale demands it.
+- **Eval harness**: inline through Project 1; extracted as a standalone tool from Project 2 (W13).
 
 ## Evaluation approach
 
@@ -83,8 +74,33 @@ Honest predictions, written before the data lands, so they can be checked later:
 
 This list gets updated as reality lands, not quietly deleted.
 
+## Reproduce
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+./scripts/fetch_corpus.sh         # sparse-checkout of MS Foundry docs
+python scripts/prepare_corpus.py  # strip MS syntax → corpus/processed.jsonl
+```
+
+Expected output: ~283 records in `corpus/processed.jsonl`. Corpus content is not committed to this repo (regenerated, not vendored — see `.gitignore`).
+
 ## Status
 
 | Week | Done |
 |-----:|------|
 | W1   | Corpus chosen. Repo and design doc up. |
+| W2   | Corpus acquired (283 records). Stack locked. Reproducible pipeline. |
+
+## Project contains
+foundry-doc-assistant/
+├── README.md            # updated Sunday with locked stack
+├── LICENSE
+├── .gitignore           # + corpus/ added
+├── pyproject.toml       # or requirements.txt
+├── scripts/
+│   ├── fetch_corpus.sh  # sparse-checkout of MicrosoftDocs
+│   └── prepare_corpus.py # markdown cleaning
+└── corpus/              # gitignored — regenerated, not committed
