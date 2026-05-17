@@ -2,6 +2,17 @@
 
 A retrieval-augmented question-answering system over Azure AI Foundry's conceptual and how-to documentation. Cited answers, measured evals, decisions defended with numbers.
 
+## Project contains
+foundry-doc-assistant/
+├── README.md            # updated Sunday with locked stack
+├── LICENSE
+├── .gitignore           # + corpus/ added
+├── pyproject.toml       # or requirements.txt
+├── scripts/
+│   ├── fetch_corpus.sh  # sparse-checkout of MicrosoftDocs
+│   └── prepare_corpus.py # markdown cleaning
+└── corpus/              # gitignored — regenerated, not committed
+
 ## What this is
 
 This is a learning project, not a product.
