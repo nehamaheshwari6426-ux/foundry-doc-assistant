@@ -1,10 +1,11 @@
 """
 Prepare the Foundry corpus for RAG indexing.
 
-Reads markdown files from corpus/source/articles/{foundry,ai-foundry},
-strips Microsoft docs-specific syntax (zone/moniker blocks, alert markers,
-image directives, INCLUDE transcludes, xrefs), and writes one JSON record
-per page to corpus/processed.jsonl.
+Reads markdown files from corpus/source/articles/foundry, resolves Microsoft
+docs INCLUDE transclusions by inlining the referenced content, strips
+Microsoft docs-specific syntax (zone/moniker blocks, alert markers, image
+directives, xrefs), and writes one JSON record per page to
+corpus/processed.jsonl.
 
 Each record:
   {
@@ -13,7 +14,7 @@ Each record:
     "title":        from frontmatter, falls back to first H1, then filename
     "ms_date":      ms.date from frontmatter (last-revised marker)
     "description":  from frontmatter
-    "content":      cleaned markdown body
+    "content":      cleaned markdown body, with INCLUDEs inlined
   }
 
 Run:
@@ -36,6 +37,7 @@ SOURCE_ROOT = Path("corpus/source")
 OUTPUT_PATH = Path("corpus/processed.jsonl")
 INCLUDE_ROOTS = ["articles/foundry"]
 MIN_CONTENT_CHARS = 200  # filter out near-empty stubs after cleaning
+MAX_INCLUDE_DEPTH = 5    # safety against pathological recursion
 
 
 # --- Microsoft docs syntax stripping ------------------------------------------
@@ -62,14 +64,17 @@ CODE_INCLUDE = re.compile(r":::code[^:]*:::")
 # [!NOTE], [!TIP], [!IMPORTANT], [!WARNING], [!CAUTION]  (blockquote callouts)
 ALERT = re.compile(r"\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]")
 
-# [!INCLUDE [name](path)]  (transcludes another file; drop, content lives elsewhere)
-INCLUDE = re.compile(r"\[!INCLUDE\s*\[[^\]]*\]\([^)]*\)\]")
-
 # <xref:something>  -> keep readable text, drop the xref scheme
 XREF = re.compile(r"<xref:([^>]+)>")
 
 # YAML frontmatter at the top of every page
 FRONTMATTER = re.compile(r"^---\r?\n(.*?)\r?\n---\r?\n", re.DOTALL)
+
+# [!INCLUDE [display name](relative/path.md)]  — resolved, not stripped
+INCLUDE_DIRECTIVE = re.compile(r"\[!INCLUDE\s*\[[^\]]*\]\(([^)]+)\)\]")
+
+# Safety-net: any unresolved INCLUDE (e.g., file not found) gets stripped
+INCLUDE_FALLBACK = re.compile(r"\[!INCLUDE\s*\[[^\]]*\]\([^)]*\)\]")
 
 
 def parse_frontmatter(text: str) -> tuple[dict, str]:
@@ -83,6 +88,38 @@ def parse_frontmatter(text: str) -> tuple[dict, str]:
     return meta, text[match.end():]
 
 
+def resolve_includes(text: str, current_file: Path, depth: int = 0) -> str:
+    """
+    Recursively inline [!INCLUDE [name](path)] references.
+
+    Microsoft docs use INCLUDE heavily to reuse content across pages
+    (intros, common steps, sign-in instructions, etc.). Stripping them
+    (the v0.1 behaviour) silently lost substantive content because the
+    INCLUDE'd material is usually NOT available as a standalone page —
+    it's a fragment used only via transclusion.
+
+    This function reads each referenced file relative to the current
+    file's location and substitutes its body inline. Recurses to handle
+    nested INCLUDEs, capped at MAX_INCLUDE_DEPTH for safety.
+    """
+    if depth >= MAX_INCLUDE_DEPTH:
+        return text
+
+    def replace_one(match: re.Match) -> str:
+        relative_path = match.group(1).strip()
+        include_path = (current_file.parent / relative_path).resolve()
+        try:
+            include_raw = include_path.read_text(encoding="utf-8", errors="replace")
+        except (FileNotFoundError, OSError):
+            return ""  # silently drop unresolvable INCLUDEs
+        # Included files occasionally have their own frontmatter; strip it.
+        _, include_body = parse_frontmatter(include_raw)
+        # Recurse so nested INCLUDEs in the included content also resolve.
+        return resolve_includes(include_body, include_path, depth + 1)
+
+    return INCLUDE_DIRECTIVE.sub(replace_one, text)
+
+
 def strip_ms_syntax(text: str) -> str:
     text = ZONE_CLOSE.sub("", ZONE_OPEN.sub("", text))
     text = MONIKER_CLOSE.sub("", MONIKER_OPEN.sub("", text))
@@ -90,7 +127,7 @@ def strip_ms_syntax(text: str) -> str:
     text = IMAGE.sub(r"[image: \1]", text)
     text = CODE_INCLUDE.sub("[code sample omitted]", text)
     text = ALERT.sub(lambda m: f"{m.group(1).title()}:", text)
-    text = INCLUDE.sub("", text)
+    text = INCLUDE_FALLBACK.sub("", text)  # safety net for unresolved INCLUDEs
     text = XREF.sub(r"\1", text)
     # collapse 3+ blank lines back to 2
     text = re.sub(r"\n{3,}", "\n\n", text)
@@ -124,6 +161,7 @@ def iter_records() -> Iterator[dict]:
                 continue
             raw = md_path.read_text(encoding="utf-8", errors="replace")
             meta, body = parse_frontmatter(raw)
+            body = resolve_includes(body, md_path)  # NEW: inline INCLUDEs
             content = strip_ms_syntax(body)
             if len(content) < MIN_CONTENT_CHARS:
                 continue
