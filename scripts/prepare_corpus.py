@@ -45,21 +45,24 @@ MAX_INCLUDE_DEPTH = 5    # safety against pathological recursion
 # purposes; stripping them leaves plain markdown the chunker can handle.
 
 # :::zone target="..." pivot="..." ... :::zone-end  (alternative content per pivot)
-ZONE_OPEN = re.compile(r":::zone[^\n]*\n", re.MULTILINE)
-ZONE_CLOSE = re.compile(r":::zone-end\s*\n?")
+# Note: MS sometimes authors these with a space — `::: zone` — so we tolerate it.
+ZONE_OPEN = re.compile(r":::\s*zone[^\n]*\n", re.MULTILINE)
+ZONE_CLOSE = re.compile(r":::\s*zone-end\s*\n?")
 
 # :::moniker range="..." ... :::moniker-end  (content scoped to product versions)
-MONIKER_OPEN = re.compile(r":::moniker[^\n]*\n", re.MULTILINE)
-MONIKER_CLOSE = re.compile(r":::moniker-end\s*\n?")
+MONIKER_OPEN = re.compile(r":::\s*moniker[^\n]*\n", re.MULTILINE)
+MONIKER_CLOSE = re.compile(r":::\s*moniker-end\s*\n?")
 
 # :::row::: / :::column::: / :::column-end::: / :::row-end:::  (layout-only)
-ROW_COL = re.compile(r":::(row|column)(-end)?:::[^\n]*\n?")
+ROW_COL = re.compile(r":::\s*(row|column)(-end)?\s*:::[^\n]*\n?")
 
-# :::image type="..." source="..." alt-text="...":::  (replace with alt text)
-IMAGE = re.compile(r":::image[^:]*alt-text=\"([^\"]*)\"[^:]*:::")
+# :::image type="..." source="..." alt-text="...":::  (with alt text — preserve semantically)
+IMAGE_WITH_ALT = re.compile(r":::\s*image[^:]*alt-text=\"([^\"]*)\"[^:]*:::")
+# :::image ... :::  (fallback: image without alt-text, e.g. icon/banner images)
+IMAGE_NO_ALT = re.compile(r":::\s*image[^:]*:::")
 
 # :::code language="..." source="..." :::  (external code samples — not useful here)
-CODE_INCLUDE = re.compile(r":::code[^:]*:::")
+CODE_INCLUDE = re.compile(r":::\s*code[^:]*:::")
 
 # [!NOTE], [!TIP], [!IMPORTANT], [!WARNING], [!CAUTION]  (blockquote callouts)
 ALERT = re.compile(r"\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]")
@@ -124,7 +127,8 @@ def strip_ms_syntax(text: str) -> str:
     text = ZONE_CLOSE.sub("", ZONE_OPEN.sub("", text))
     text = MONIKER_CLOSE.sub("", MONIKER_OPEN.sub("", text))
     text = ROW_COL.sub("", text)
-    text = IMAGE.sub(r"[image: \1]", text)
+    text = IMAGE_WITH_ALT.sub(r"[image: \1]", text)
+    text = IMAGE_NO_ALT.sub("[image]", text)
     text = CODE_INCLUDE.sub("[code sample omitted]", text)
     text = ALERT.sub(lambda m: f"{m.group(1).title()}:", text)
     text = INCLUDE_FALLBACK.sub("", text)  # safety net for unresolved INCLUDEs

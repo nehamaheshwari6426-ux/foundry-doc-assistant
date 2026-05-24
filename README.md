@@ -81,8 +81,17 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
-./scripts/fetch_corpus.sh         # sparse-checkout of MS Foundry docs
+bash scripts/fetch_corpus.sh
+
+# sparse-checkout of MS Foundry docs
 python scripts/prepare_corpus.py  # strip MS syntax → corpus/processed.jsonl
+
+python scripts/inspect_records.py             # 5 random records, side-by-side
+python scripts/inspect_records.py -n 50 --seed 1 > logs/brain_dump_records.md
+python scripts/inspect_records.py -n 10       # 10 random
+python scripts/inspect_records.py --seed 42   # reproducible for shared review
+python scripts/inspect_records.py --id abc123 # specific record by id
+
 ```
 
 Expected output: ~283 records in `corpus/processed.jsonl`. Corpus content is not committed to this repo (regenerated, not vendored — see `.gitignore`).
@@ -93,6 +102,7 @@ Expected output: ~283 records in `corpus/processed.jsonl`. Corpus content is not
 |-----:|------|
 | W1   | Corpus chosen. Repo and design doc up. |
 | W2   | Corpus acquired (283 records). Stack locked. Reproducible pipeline. |
+| W3   | Updated scripts and now we have 372 records. |
 
 ## Project contains
 foundry-doc-assistant/

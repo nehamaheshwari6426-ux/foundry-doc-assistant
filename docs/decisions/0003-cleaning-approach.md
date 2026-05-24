@@ -2,9 +2,11 @@
 
 | | |
 |---|---|
-| **Status** | Accepted |
+| **Status** | Superseded by [ADR 0005](0005-cleaning-approach-revised.md) |
 | **Date** | 2026-05-17 |
 | **Phase** | 2 — Data & Knowledge Curation |
+
+> **Note (added 2026-05-24):** The "drop INCLUDEs because content lives elsewhere" assumption in this ADR was falsified by spot-check evidence in W2-W3. See [ADR 0005](0005-cleaning-approach-revised.md) for the revised approach (INCLUDE resolution by inlining, plus authoring-variance tolerance in directive regexes). This document is retained as historical record.
 
 ## Context
 
