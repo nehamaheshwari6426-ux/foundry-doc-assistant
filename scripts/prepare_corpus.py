@@ -154,6 +154,11 @@ def should_skip(rel_path: Path) -> bool:
         return True
     if rel_path.parent.name == "reference":
         return True
+    # API reference docs that live at product folder root with predictable
+    # filenames, bypassing the reference/ subfolder filter. See ADR 0008.
+    name = rel_path.name
+    if name == "latest.md" or name.startswith("reference-") or name.startswith("authoring-reference-"):
+        return True
     return False
 
 

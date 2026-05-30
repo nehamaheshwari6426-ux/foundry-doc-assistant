@@ -8,9 +8,12 @@ Semantic chunking is a Phase 6 experiment, not a v0.1 choice.
 Public contract:
     chunk_records(records, chunk_size=800, overlap=100) -> list[dict]
 
-    Input record shape:  {id, title, path, content}
-    Output chunk shape:  {id, text, metadata}
-        where metadata = {source_id, title, path, chunk_index}
+    Input record shape (per prepare_corpus.py):
+        {id, source_path, title, ms_date, description, content}
+
+    Output chunk shape:
+        {id, text, metadata}
+        where metadata = {source_id, source_path, title, chunk_index}
 """
 
 from __future__ import annotations
@@ -52,18 +55,18 @@ def chunk_records(
     """Split records into overlapping chunks with provenance metadata.
 
     Args:
-        records: list of records with shape {id, title, path, content}
-        chunk_size: target chunk size in characters
-        overlap: character overlap between consecutive chunks
+        records: list of records per the prepare_corpus.py contract.
+        chunk_size: target chunk size in characters.
+        overlap: character overlap between consecutive chunks.
 
     Returns:
-        list of chunks with shape {id, text, metadata}
+        list of chunks with shape {id, text, metadata}.
     """
     chunks: list[dict] = []
     for record in records:
         source_id = record["id"]
         title = record.get("title", "")
-        path = record.get("path", "")
+        source_path = record.get("source_path", "")
         content = record["content"]
 
         pieces = chunk_text(content, chunk_size=chunk_size, overlap=overlap)
@@ -74,8 +77,8 @@ def chunk_records(
                     "text": piece,
                     "metadata": {
                         "source_id": source_id,
+                        "source_path": source_path,
                         "title": title,
-                        "path": path,
                         "chunk_index": i,
                     },
                 }
