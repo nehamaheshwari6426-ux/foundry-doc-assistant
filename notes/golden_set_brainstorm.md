@@ -9,7 +9,7 @@ what is industry way of organising role based access for foundary resources? wha
 
 ## How-to
 - Q: ...
-How can I avoid incurring charges o n unused services and resources in Foundary?
+How can I avoid incurring charges on unused services and resources in Foundary?
 - How can I specify who is eligible for which model deployment in my team? i.e. access control for model deployments
 - How can I identify if it's a good idea to implement batch processing for my project?
 
